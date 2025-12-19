@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html class="dark" lang="id">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Jadwal Informatika Medis III</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#4287f5",
+                        "background-light": "#f8f8f5",
+                        "background-dark": "#1a1a1a",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#262626",
+                        "text-main": "#1c1c0d",
+                        "text-muted": "#9e9d47",
+                        "neutral-light": "#e9e8ce",
+                        "neutral-dark": "#3a3928",
+                    },
+                    fontFamily: {
+                        "display": ["Spline Sans", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "1rem",
+                        "lg": "1.5rem",
+                        "xl": "2rem",
+                        "2xl": "2.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-text-main dark:text-gray-100 font-display transition-colors duration-300">
+    <div id="app" class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+        <!-- Content will be loaded here by router -->
+    </div>
+
+    <!-- Data Files -->
+    <script src="js/data/config.js"></script>
+    <script src="js/data/dosen.js"></script>
+    <script src="js/data/jadwal.js"></script>
+    <script src="js/data/matakuliah.js"></script>
+
+    <!-- Utility Files -->
+    <script src="js/utils/date.js"></script>
+    <script src="js/utils/whatsapp.js"></script>
+    <script src="js/utils/storage.js"></script>
+    <script src="js/utils/dataManager.js"></script>
+
+    <!-- Components -->
+    <script src="js/components/header.js"></script>
+    <script src="js/components/navbar.js"></script>
+    <script src="js/components/scheduleCard.js"></script>
+    <script src="js/components/lecturerModal.js"></script>
+    <script src="js/components/adminModal.js"></script>
+
+    <!-- Pages -->
+    <script src="js/pages/home.js"></script>
+    <script src="js/pages/weekly.js"></script>
+    <script src="js/pages/lecturers.js"></script>
+    <script src="js/pages/login.js"></script>
+    <script src="js/pages/admin/dashboard.js"></script>
+    <script src="js/pages/admin/manageDosen.js"></script>
+    <script src="js/pages/admin/manageJadwal.js"></script>
+    <script src="js/pages/admin/manageMataKuliah.js"></script>
+
+    <!-- Main App -->
+    <script src="js/app.js"></script>
+</body>
+
+</html>
