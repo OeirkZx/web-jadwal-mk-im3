@@ -1,0 +1,100 @@
+{
+    "name": "Jadwal Informatika Medis III",
+    "short_name": "Jadwal IM",
+    "description": "Aplikasi jadwal kuliah kelas Informatika Medis III - Lihat jadwal, hubungi dosen, dan kelola kelas",
+    "start_url": "./index.html",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#1a1a1a",
+    "theme_color": "#4287f5",
+    "orientation": "portrait-primary",
+    "categories": ["education", "productivity"],
+    "lang": "id-ID",
+    "icons": [
+        {
+            "src": "icons/icon-72x72.png",
+            "sizes": "72x72",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-96x96.png",
+            "sizes": "96x96",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-128x128.png",
+            "sizes": "128x128",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-144x144.png",
+            "sizes": "144x144",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-152x152.png",
+            "sizes": "152x152",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-384x384.png",
+            "sizes": "384x384",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "icons/screenshot-wide.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide"
+        },
+        {
+            "src": "icons/screenshot-mobile.png",
+            "sizes": "540x720",
+            "type": "image/png",
+            "form_factor": "narrow"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Jadwal Hari Ini",
+            "short_name": "Hari Ini",
+            "description": "Lihat jadwal kuliah hari ini",
+            "url": "./index.html#/",
+            "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+        },
+        {
+            "name": "Jadwal Mingguan",
+            "short_name": "Mingguan",
+            "description": "Lihat jadwal seluruh minggu",
+            "url": "./index.html#/mingguan",
+            "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+        },
+        {
+            "name": "Direktori Dosen",
+            "short_name": "Dosen",
+            "description": "Lihat daftar dan kontak dosen",
+            "url": "./index.html#/dosen",
+            "icons": [{ "src": "icons/icon-96x96.png", "sizes": "96x96" }]
+        }
+    ]
+}
