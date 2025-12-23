@@ -1,4 +1,4 @@
-// Manage Mata Kuliah Page with Full CRUD
+// Manage Mata Kuliah Page with Supabase CRUD
 
 const ManageMataKuliahPage = {
     render() {
@@ -10,7 +10,7 @@ const ManageMataKuliahPage = {
         const mkData = DataManager.getMataKuliah();
 
         const mkRows = mkData.map((mk, index) => {
-            const jadwalCount = DataManager.getJadwal().filter(j => j.mkId === mk.id).length;
+            const jadwalCount = DataManager.getJadwal().filter(j => (j.mkId || j.mk_id) === mk.id).length;
 
             return `
                 <tr class="hover:bg-[#1e293b]/50 transition-colors" style="animation: staggerFadeIn 0.4s ease ${index * 0.05}s backwards;">
@@ -30,7 +30,7 @@ const ManageMataKuliahPage = {
                             <button onclick="ManageMataKuliahPage.edit(${mk.id})" class="size-9 flex items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary hover:text-white transition-colors" title="Edit">
                                 <span class="material-symbols-outlined text-[18px]">edit</span>
                             </button>
-                            <button onclick="ManageMataKuliahPage.delete(${mk.id}, '${mk.nama}')" class="size-9 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white transition-colors" title="Hapus">
+                            <button onclick="ManageMataKuliahPage.delete(${mk.id}, '${mk.nama.replace(/'/g, "\\'")}')" class="size-9 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white transition-colors" title="Hapus">
                                 <span class="material-symbols-outlined text-[18px]">delete</span>
                             </button>
                         </div>
@@ -120,7 +120,7 @@ const ManageMataKuliahPage = {
     },
 
     add() {
-        AdminModal.show('Tambah Mata Kuliah Baru', this.getForm(), () => {
+        AdminModal.show('Tambah Mata Kuliah Baru', this.getForm(), async () => {
             const form = document.getElementById('mk-form');
             const formData = new FormData(form);
 
@@ -131,9 +131,15 @@ const ManageMataKuliahPage = {
                 jenis: formData.get('jenis')
             };
 
-            DataManager.addMataKuliah(mk);
             AdminModal.hide();
-            AdminModal.toast('Mata kuliah berhasil ditambahkan!');
+            AdminModal.toast('Menyimpan...', 'info');
+
+            const result = await DataManager.addMataKuliah(mk);
+            if (result) {
+                AdminModal.toast('Mata kuliah berhasil ditambahkan!');
+            } else {
+                AdminModal.toast('Gagal menambahkan mata kuliah', 'error');
+            }
             App.refresh();
         });
     },
@@ -142,7 +148,7 @@ const ManageMataKuliahPage = {
         const mk = DataManager.getMataKuliahById(id);
         if (!mk) return;
 
-        AdminModal.show('Edit Mata Kuliah', this.getForm(mk), () => {
+        AdminModal.show('Edit Mata Kuliah', this.getForm(mk), async () => {
             const form = document.getElementById('mk-form');
             const formData = new FormData(form);
 
@@ -153,9 +159,15 @@ const ManageMataKuliahPage = {
                 jenis: formData.get('jenis')
             };
 
-            DataManager.updateMataKuliah(id, updates);
             AdminModal.hide();
-            AdminModal.toast('Mata kuliah berhasil diperbarui!');
+            AdminModal.toast('Menyimpan...', 'info');
+
+            const result = await DataManager.updateMataKuliah(id, updates);
+            if (result) {
+                AdminModal.toast('Mata kuliah berhasil diperbarui!');
+            } else {
+                AdminModal.toast('Gagal memperbarui mata kuliah', 'error');
+            }
             App.refresh();
         });
     },
@@ -163,9 +175,14 @@ const ManageMataKuliahPage = {
     delete(id, nama) {
         AdminModal.confirmDelete(
             `Apakah Anda yakin ingin menghapus <strong class="text-white">${nama}</strong>? Jadwal yang terkait juga akan dihapus.`,
-            () => {
-                DataManager.deleteMataKuliah(id);
-                AdminModal.toast('Mata kuliah berhasil dihapus!');
+            async () => {
+                AdminModal.toast('Menghapus...', 'info');
+                const result = await DataManager.deleteMataKuliah(id);
+                if (result) {
+                    AdminModal.toast('Mata kuliah berhasil dihapus!');
+                } else {
+                    AdminModal.toast('Gagal menghapus mata kuliah', 'error');
+                }
                 App.refresh();
             }
         );

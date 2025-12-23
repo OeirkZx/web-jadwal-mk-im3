@@ -1,4 +1,4 @@
-// Manage Jadwal Page with Full CRUD
+// Manage Jadwal Page with Supabase CRUD
 
 const ManageJadwalPage = {
     render() {
@@ -22,7 +22,7 @@ const ManageJadwalPage = {
                         </td>
                         <td class="px-4 py-3 text-gray-300">${j.ruangan}</td>
                         <td class="px-4 py-3 text-gray-300 hidden md:table-cell">${j.dosen?.nama?.split(',')[0] || 'N/A'}</td>
-                        <td class="px-4 py-3 text-gray-300 hidden lg:table-cell">${j.pjNama}</td>
+                        <td class="px-4 py-3 text-gray-300 hidden lg:table-cell">${j.pjNama || '-'}</td>
                         <td class="px-4 py-3">
                             <div class="flex gap-2">
                                 <button onclick="ManageJadwalPage.edit(${j.id})" class="size-8 flex items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary hover:text-white transition-colors" title="Edit">
@@ -95,16 +95,20 @@ const ManageJadwalPage = {
     getForm(jadwal = null) {
         const isEdit = jadwal !== null;
         const dosenOptions = DataManager.getDosen().map(d =>
-            `<option value="${d.id}" ${isEdit && jadwal.dosenId === d.id ? 'selected' : ''}>${d.nama}</option>`
+            `<option value="${d.id}" ${isEdit && (jadwal.dosenId === d.id || jadwal.dosen_id === d.id) ? 'selected' : ''}>${d.nama}</option>`
         ).join('');
 
         const mkOptions = DataManager.getMataKuliah().map(m =>
-            `<option value="${m.id}" ${isEdit && jadwal.mkId === m.id ? 'selected' : ''}>${m.nama} (${m.kode})</option>`
+            `<option value="${m.id}" ${isEdit && (jadwal.mkId === m.id || jadwal.mk_id === m.id) ? 'selected' : ''}>${m.nama} (${m.kode})</option>`
         ).join('');
 
         const hariOptions = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'].map(h =>
             `<option value="${h}" ${isEdit && jadwal.hari === h ? 'selected' : ''}>${h}</option>`
         ).join('');
+
+        const jamMulai = isEdit ? (jadwal.jamMulai || jadwal.jam_mulai || '') : '';
+        const jamSelesai = isEdit ? (jadwal.jamSelesai || jadwal.jam_selesai || '') : '';
+        const pjNama = isEdit ? (jadwal.pjNama || jadwal.pj_nama || '') : '';
 
         return `
             <form id="jadwal-form" class="flex flex-col gap-4">
@@ -125,12 +129,12 @@ const ManageJadwalPage = {
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">Jam Mulai</label>
-                        <input type="time" name="jamMulai" value="${isEdit ? jadwal.jamMulai : ''}" required
+                        <input type="time" name="jamMulai" value="${jamMulai}" required
                             class="w-full px-4 py-3 rounded-lg bg-[#1e293b] border border-[#334155] text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none"/>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">Jam Selesai</label>
-                        <input type="time" name="jamSelesai" value="${isEdit ? jadwal.jamSelesai : ''}" required
+                        <input type="time" name="jamSelesai" value="${jamSelesai}" required
                             class="w-full px-4 py-3 rounded-lg bg-[#1e293b] border border-[#334155] text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none"/>
                     </div>
                 </div>
@@ -150,7 +154,7 @@ const ManageJadwalPage = {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-2">Nama PJ Kelas</label>
-                    <input type="text" name="pjNama" value="${isEdit ? jadwal.pjNama : ''}" required
+                    <input type="text" name="pjNama" value="${pjNama}" required
                         class="w-full px-4 py-3 rounded-lg bg-[#1e293b] border border-[#334155] text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                         placeholder="Nama mahasiswa PJ"/>
                 </div>
@@ -160,7 +164,7 @@ const ManageJadwalPage = {
     },
 
     add() {
-        AdminModal.show('Tambah Jadwal Baru', this.getForm(), () => {
+        AdminModal.show('Tambah Jadwal Baru', this.getForm(), async () => {
             const form = document.getElementById('jadwal-form');
             const formData = new FormData(form);
 
@@ -174,9 +178,15 @@ const ManageJadwalPage = {
                 pjNama: formData.get('pjNama')
             };
 
-            DataManager.addJadwal(jadwal);
             AdminModal.hide();
-            AdminModal.toast('Jadwal berhasil ditambahkan!');
+            AdminModal.toast('Menyimpan...', 'info');
+
+            const result = await DataManager.addJadwal(jadwal);
+            if (result) {
+                AdminModal.toast('Jadwal berhasil ditambahkan!');
+            } else {
+                AdminModal.toast('Gagal menambahkan jadwal', 'error');
+            }
             App.refresh();
         });
     },
@@ -185,7 +195,7 @@ const ManageJadwalPage = {
         const jadwal = DataManager.getJadwalById(id);
         if (!jadwal) return;
 
-        AdminModal.show('Edit Jadwal', this.getForm(jadwal), () => {
+        AdminModal.show('Edit Jadwal', this.getForm(jadwal), async () => {
             const form = document.getElementById('jadwal-form');
             const formData = new FormData(form);
 
@@ -199,22 +209,33 @@ const ManageJadwalPage = {
                 pjNama: formData.get('pjNama')
             };
 
-            DataManager.updateJadwal(id, updates);
             AdminModal.hide();
-            AdminModal.toast('Jadwal berhasil diperbarui!');
+            AdminModal.toast('Menyimpan...', 'info');
+
+            const result = await DataManager.updateJadwal(id, updates);
+            if (result) {
+                AdminModal.toast('Jadwal berhasil diperbarui!');
+            } else {
+                AdminModal.toast('Gagal memperbarui jadwal', 'error');
+            }
             App.refresh();
         });
     },
 
     delete(id) {
         const jadwal = DataManager.getJadwalById(id);
-        const mk = jadwal ? DataManager.getMataKuliahById(jadwal.mkId) : null;
+        const mk = jadwal ? DataManager.getMataKuliahById(jadwal.mk_id || jadwal.mkId) : null;
 
         AdminModal.confirmDelete(
             `Hapus jadwal <strong class="text-white">${mk?.nama || 'ini'}</strong>?`,
-            () => {
-                DataManager.deleteJadwal(id);
-                AdminModal.toast('Jadwal berhasil dihapus!');
+            async () => {
+                AdminModal.toast('Menghapus...', 'info');
+                const result = await DataManager.deleteJadwal(id);
+                if (result) {
+                    AdminModal.toast('Jadwal berhasil dihapus!');
+                } else {
+                    AdminModal.toast('Gagal menghapus jadwal', 'error');
+                }
                 App.refresh();
             }
         );

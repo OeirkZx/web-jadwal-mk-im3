@@ -1,4 +1,4 @@
-// Manage Dosen Page with Full CRUD
+// Manage Dosen Page with Supabase CRUD
 
 const ManageDosenPage = {
     render() {
@@ -10,31 +10,31 @@ const ManageDosenPage = {
         const dosenData = DataManager.getDosen();
 
         const dosenRows = dosenData.map((dosen, index) => {
-            const courses = DataManager.getJadwal()
-                .filter(j => j.dosenId === dosen.id)
-                .map(j => DataManager.getMataKuliahById(j.mkId))
-                .filter(m => m)
-                .filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
+            const nama = dosen.nama;
+            const nidn = dosen.nidn;
+            const email = dosen.email;
+            const foto = dosen.foto;
+            const bidang = dosen.bidang;
 
             return `
                 <tr class="hover:bg-[#1e293b]/50 transition-colors" style="animation: staggerFadeIn 0.4s ease ${index * 0.05}s backwards;">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center gap-3">
-                            <div class="size-10 rounded-full bg-cover bg-center ring-2 ring-[#334155]" style="background-image: url('${dosen.foto}');"></div>
+                            <div class="size-10 rounded-full bg-cover bg-center ring-2 ring-[#334155]" style="background-image: url('${foto}');"></div>
                             <div>
-                                <div class="text-white font-bold">${dosen.nama}</div>
-                                <div class="text-gray-400 text-sm">${dosen.bidang}</div>
+                                <div class="text-white font-bold">${nama}</div>
+                                <div class="text-gray-400 text-sm">${bidang}</div>
                             </div>
                         </div>
                     </td>
-                    <td class="px-6 py-4 text-gray-300">${dosen.nidn}</td>
-                    <td class="px-6 py-4 text-gray-300 hidden md:table-cell">${dosen.email}</td>
+                    <td class="px-6 py-4 text-gray-300">${nidn}</td>
+                    <td class="px-6 py-4 text-gray-300 hidden md:table-cell">${email}</td>
                     <td class="px-6 py-4">
                         <div class="flex gap-2">
                             <button onclick="ManageDosenPage.edit(${dosen.id})" class="size-9 flex items-center justify-center rounded-lg bg-primary/20 text-primary hover:bg-primary hover:text-white transition-colors" title="Edit">
                                 <span class="material-symbols-outlined text-[18px]">edit</span>
                             </button>
-                            <button onclick="ManageDosenPage.delete(${dosen.id}, '${dosen.nama}')" class="size-9 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white transition-colors" title="Hapus">
+                            <button onclick="ManageDosenPage.delete(${dosen.id}, '${nama.replace(/'/g, "\\'")}')" class="size-9 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-600 hover:text-white transition-colors" title="Hapus">
                                 <span class="material-symbols-outlined text-[18px]">delete</span>
                             </button>
                         </div>
@@ -87,6 +87,8 @@ const ManageDosenPage = {
     // Form HTML for add/edit
     getForm(dosen = null) {
         const isEdit = dosen !== null;
+        const noHp = isEdit ? (dosen.no_hp || dosen.noHp || '') : '';
+
         return `
             <form id="dosen-form" class="flex flex-col gap-4">
                 <div>
@@ -104,7 +106,7 @@ const ManageDosenPage = {
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">No. HP (WhatsApp)</label>
-                        <input type="text" name="noHp" value="${isEdit ? dosen.noHp : ''}" required
+                        <input type="text" name="noHp" value="${noHp}" required
                             class="w-full px-4 py-3 rounded-lg bg-[#1e293b] border border-[#334155] text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                             placeholder="6281234567890"/>
                     </div>
@@ -127,7 +129,7 @@ const ManageDosenPage = {
     },
 
     add() {
-        AdminModal.show('Tambah Dosen Baru', this.getForm(), () => {
+        AdminModal.show('Tambah Dosen Baru', this.getForm(), async () => {
             const form = document.getElementById('dosen-form');
             const formData = new FormData(form);
 
@@ -139,9 +141,15 @@ const ManageDosenPage = {
                 bidang: formData.get('bidang')
             };
 
-            DataManager.addDosen(dosen);
             AdminModal.hide();
-            AdminModal.toast('Dosen berhasil ditambahkan!');
+            AdminModal.toast('Menyimpan...', 'info');
+
+            const result = await DataManager.addDosen(dosen);
+            if (result) {
+                AdminModal.toast('Dosen berhasil ditambahkan!');
+            } else {
+                AdminModal.toast('Gagal menambahkan dosen', 'error');
+            }
             App.refresh();
         });
     },
@@ -150,7 +158,7 @@ const ManageDosenPage = {
         const dosen = DataManager.getDosenById(id);
         if (!dosen) return;
 
-        AdminModal.show('Edit Data Dosen', this.getForm(dosen), () => {
+        AdminModal.show('Edit Data Dosen', this.getForm(dosen), async () => {
             const form = document.getElementById('dosen-form');
             const formData = new FormData(form);
 
@@ -162,9 +170,15 @@ const ManageDosenPage = {
                 bidang: formData.get('bidang')
             };
 
-            DataManager.updateDosen(id, updates);
             AdminModal.hide();
-            AdminModal.toast('Data dosen berhasil diperbarui!');
+            AdminModal.toast('Menyimpan...', 'info');
+
+            const result = await DataManager.updateDosen(id, updates);
+            if (result) {
+                AdminModal.toast('Data dosen berhasil diperbarui!');
+            } else {
+                AdminModal.toast('Gagal memperbarui data', 'error');
+            }
             App.refresh();
         });
     },
@@ -172,9 +186,14 @@ const ManageDosenPage = {
     delete(id, nama) {
         AdminModal.confirmDelete(
             `Apakah Anda yakin ingin menghapus <strong class="text-white">${nama}</strong>? Jadwal yang terkait juga akan dihapus.`,
-            () => {
-                DataManager.deleteDosen(id);
-                AdminModal.toast('Dosen berhasil dihapus!');
+            async () => {
+                AdminModal.toast('Menghapus...', 'info');
+                const result = await DataManager.deleteDosen(id);
+                if (result) {
+                    AdminModal.toast('Dosen berhasil dihapus!');
+                } else {
+                    AdminModal.toast('Gagal menghapus dosen', 'error');
+                }
                 App.refresh();
             }
         );

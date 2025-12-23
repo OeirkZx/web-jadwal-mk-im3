@@ -1,42 +1,72 @@
-// Data Manager - Handles CRUD operations with LocalStorage
-// Data awal dari file tetap ada sebagai default, tapi editan disimpan di localStorage
+// Data Manager - Handles CRUD operations with Supabase Backend
+// Data disimpan di cloud database, bisa diakses semua user
 
 const DataManager = {
-    STORAGE_KEYS: {
-        DOSEN: 'jadwal_data_dosen',
-        MATAKULIAH: 'jadwal_data_matakuliah',
-        JADWAL: 'jadwal_data_jadwal',
-        QUICK_LINKS: 'jadwal_data_links'
+    // Cache data lokal untuk performa
+    cache: {
+        dosen: null,
+        matakuliah: null,
+        jadwal: null,
+        lastFetch: null
     },
+
+    // Waktu cache valid (5 menit)
+    CACHE_DURATION: 5 * 60 * 1000,
+
+    // Flag apakah sudah terinisialisasi
+    initialized: false,
 
     // ============================================
     // INITIALIZATION
     // ============================================
 
-    init() {
-        // Load data from localStorage or use defaults
-        this.loadAllData();
+    async init() {
+        console.log('[DataManager] Initializing with Supabase backend...');
+
+        // Load initial data
+        await this.refreshAllData();
+
+        this.initialized = true;
+        console.log('[DataManager] Initialization complete');
     },
 
-    loadAllData() {
-        // Load or initialize each data type
-        if (!localStorage.getItem(this.STORAGE_KEYS.DOSEN)) {
-            this.saveDosen(DOSEN_DATA);
-        }
-        if (!localStorage.getItem(this.STORAGE_KEYS.MATAKULIAH)) {
-            this.saveMataKuliah(MATAKULIAH_DATA);
-        }
-        if (!localStorage.getItem(this.STORAGE_KEYS.JADWAL)) {
-            this.saveJadwal(JADWAL_DATA);
+    async refreshAllData() {
+        try {
+            // Fetch all data from Supabase
+            const [dosen, matakuliah, jadwal] = await Promise.all([
+                SupabaseClient.get('dosen', 'order=id'),
+                SupabaseClient.get('matakuliah', 'order=id'),
+                SupabaseClient.get('jadwal', 'order=hari,jam_mulai')
+            ]);
+
+            // Update cache
+            this.cache.dosen = dosen || [];
+            this.cache.matakuliah = matakuliah || [];
+            this.cache.jadwal = jadwal || [];
+            this.cache.lastFetch = Date.now();
+
+            console.log('[DataManager] Data refreshed from Supabase');
+
+            // Fallback to default data if database is empty
+            if (this.cache.dosen.length === 0) {
+                console.log('[DataManager] Database empty, using default data');
+                this.cache.dosen = DOSEN_DATA || [];
+                this.cache.matakuliah = MATAKULIAH_DATA || [];
+                this.cache.jadwal = JADWAL_DATA || [];
+            }
+
+        } catch (error) {
+            console.error('[DataManager] Failed to fetch from Supabase:', error);
+            // Fallback to default data from JS files
+            this.cache.dosen = DOSEN_DATA || [];
+            this.cache.matakuliah = MATAKULIAH_DATA || [];
+            this.cache.jadwal = JADWAL_DATA || [];
         }
     },
 
-    // Reset ke data default
-    resetToDefault() {
-        localStorage.removeItem(this.STORAGE_KEYS.DOSEN);
-        localStorage.removeItem(this.STORAGE_KEYS.MATAKULIAH);
-        localStorage.removeItem(this.STORAGE_KEYS.JADWAL);
-        this.loadAllData();
+    isCacheValid() {
+        if (!this.cache.lastFetch) return false;
+        return (Date.now() - this.cache.lastFetch) < this.CACHE_DURATION;
     },
 
     // ============================================
@@ -44,59 +74,89 @@ const DataManager = {
     // ============================================
 
     getDosen() {
-        const data = localStorage.getItem(this.STORAGE_KEYS.DOSEN);
-        return data ? JSON.parse(data) : DOSEN_DATA;
+        return this.cache.dosen || [];
     },
 
-    saveDosen(data) {
-        localStorage.setItem(this.STORAGE_KEYS.DOSEN, JSON.stringify(data));
+    async fetchDosen() {
+        const data = await SupabaseClient.get('dosen', 'order=id');
+        if (data) {
+            this.cache.dosen = data;
+        }
+        return this.cache.dosen;
     },
 
     getDosenById(id) {
         return this.getDosen().find(d => d.id === id);
     },
 
-    addDosen(dosen) {
-        const data = this.getDosen();
-        const newId = data.length > 0 ? Math.max(...data.map(d => d.id)) + 1 : 1;
-        dosen.id = newId;
-
+    async addDosen(dosen) {
         // Generate avatar if no foto provided
         if (!dosen.foto) {
             dosen.foto = `https://ui-avatars.com/api/?name=${encodeURIComponent(dosen.nama)}&background=4287f5&color=fff&size=128`;
         }
 
-        data.push(dosen);
-        this.saveDosen(data);
-        return dosen;
-    },
+        // Map to database column names
+        const dbData = {
+            nama: dosen.nama,
+            nidn: dosen.nidn,
+            no_hp: dosen.noHp,
+            email: dosen.email,
+            bidang: dosen.bidang,
+            foto: dosen.foto
+        };
 
-    updateDosen(id, updates) {
-        const data = this.getDosen();
-        const index = data.findIndex(d => d.id === id);
-        if (index !== -1) {
-            data[index] = { ...data[index], ...updates };
-
-            // Regenerate avatar if name changed and no custom foto
-            if (updates.nama && !updates.foto) {
-                data[index].foto = `https://ui-avatars.com/api/?name=${encodeURIComponent(updates.nama)}&background=4287f5&color=fff&size=128`;
-            }
-
-            this.saveDosen(data);
-            return data[index];
+        const result = await SupabaseClient.insert('dosen', dbData);
+        if (result && result.length > 0) {
+            await this.fetchDosen();
+            return this.mapDosenFromDb(result[0]);
         }
         return null;
     },
 
-    deleteDosen(id) {
-        const data = this.getDosen();
-        const filtered = data.filter(d => d.id !== id);
-        this.saveDosen(filtered);
+    async updateDosen(id, updates) {
+        const dbData = {};
+        if (updates.nama) dbData.nama = updates.nama;
+        if (updates.nidn) dbData.nidn = updates.nidn;
+        if (updates.noHp) dbData.no_hp = updates.noHp;
+        if (updates.email) dbData.email = updates.email;
+        if (updates.bidang) dbData.bidang = updates.bidang;
+        if (updates.foto) dbData.foto = updates.foto;
 
-        // Also remove related jadwal
-        const jadwal = this.getJadwal();
-        const filteredJadwal = jadwal.filter(j => j.dosenId !== id);
-        this.saveJadwal(filteredJadwal);
+        // Regenerate avatar if name changed and no custom foto
+        if (updates.nama && !updates.foto) {
+            dbData.foto = `https://ui-avatars.com/api/?name=${encodeURIComponent(updates.nama)}&background=4287f5&color=fff&size=128`;
+        }
+
+        dbData.updated_at = new Date().toISOString();
+
+        const result = await SupabaseClient.update('dosen', id, dbData);
+        if (result) {
+            await this.fetchDosen();
+            return true;
+        }
+        return false;
+    },
+
+    async deleteDosen(id) {
+        const result = await SupabaseClient.delete('dosen', id);
+        if (result) {
+            await this.fetchDosen();
+            await this.fetchJadwal(); // Jadwal related to this dosen will be deleted by CASCADE
+        }
+        return result;
+    },
+
+    // Map database columns to JS object
+    mapDosenFromDb(dbRow) {
+        return {
+            id: dbRow.id,
+            nama: dbRow.nama,
+            nidn: dbRow.nidn,
+            noHp: dbRow.no_hp,
+            email: dbRow.email,
+            bidang: dbRow.bidang,
+            foto: dbRow.foto
+        };
     },
 
     // ============================================
@@ -104,47 +164,47 @@ const DataManager = {
     // ============================================
 
     getMataKuliah() {
-        const data = localStorage.getItem(this.STORAGE_KEYS.MATAKULIAH);
-        return data ? JSON.parse(data) : MATAKULIAH_DATA;
+        return this.cache.matakuliah || [];
     },
 
-    saveMataKuliah(data) {
-        localStorage.setItem(this.STORAGE_KEYS.MATAKULIAH, JSON.stringify(data));
+    async fetchMataKuliah() {
+        const data = await SupabaseClient.get('matakuliah', 'order=id');
+        if (data) {
+            this.cache.matakuliah = data;
+        }
+        return this.cache.matakuliah;
     },
 
     getMataKuliahById(id) {
         return this.getMataKuliah().find(m => m.id === id);
     },
 
-    addMataKuliah(mk) {
-        const data = this.getMataKuliah();
-        const newId = data.length > 0 ? Math.max(...data.map(m => m.id)) + 1 : 1;
-        mk.id = newId;
-        data.push(mk);
-        this.saveMataKuliah(data);
-        return mk;
-    },
-
-    updateMataKuliah(id, updates) {
-        const data = this.getMataKuliah();
-        const index = data.findIndex(m => m.id === id);
-        if (index !== -1) {
-            data[index] = { ...data[index], ...updates };
-            this.saveMataKuliah(data);
-            return data[index];
+    async addMataKuliah(mk) {
+        const result = await SupabaseClient.insert('matakuliah', mk);
+        if (result && result.length > 0) {
+            await this.fetchMataKuliah();
+            return result[0];
         }
         return null;
     },
 
-    deleteMataKuliah(id) {
-        const data = this.getMataKuliah();
-        const filtered = data.filter(m => m.id !== id);
-        this.saveMataKuliah(filtered);
+    async updateMataKuliah(id, updates) {
+        updates.updated_at = new Date().toISOString();
+        const result = await SupabaseClient.update('matakuliah', id, updates);
+        if (result) {
+            await this.fetchMataKuliah();
+            return true;
+        }
+        return false;
+    },
 
-        // Also remove related jadwal
-        const jadwal = this.getJadwal();
-        const filteredJadwal = jadwal.filter(j => j.mkId !== id);
-        this.saveJadwal(filteredJadwal);
+    async deleteMataKuliah(id) {
+        const result = await SupabaseClient.delete('matakuliah', id);
+        if (result) {
+            await this.fetchMataKuliah();
+            await this.fetchJadwal(); // Related jadwal deleted by CASCADE
+        }
+        return result;
     },
 
     // ============================================
@@ -152,55 +212,106 @@ const DataManager = {
     // ============================================
 
     getJadwal() {
-        const data = localStorage.getItem(this.STORAGE_KEYS.JADWAL);
-        return data ? JSON.parse(data) : JADWAL_DATA;
+        return this.cache.jadwal || [];
     },
 
-    saveJadwal(data) {
-        localStorage.setItem(this.STORAGE_KEYS.JADWAL, JSON.stringify(data));
+    async fetchJadwal() {
+        const data = await SupabaseClient.get('jadwal', 'order=hari,jam_mulai');
+        if (data) {
+            this.cache.jadwal = data;
+        }
+        return this.cache.jadwal;
     },
 
     getJadwalById(id) {
         return this.getJadwal().find(j => j.id === id);
     },
 
-    addJadwal(jadwal) {
-        const data = this.getJadwal();
-        const newId = data.length > 0 ? Math.max(...data.map(j => j.id)) + 1 : 1;
-        jadwal.id = newId;
-        data.push(jadwal);
-        this.saveJadwal(data);
-        return jadwal;
-    },
+    async addJadwal(jadwal) {
+        // Map to database column names
+        const dbData = {
+            hari: jadwal.hari,
+            jam_mulai: jadwal.jamMulai,
+            jam_selesai: jadwal.jamSelesai,
+            ruangan: jadwal.ruangan,
+            mk_id: jadwal.mkId,
+            dosen_id: jadwal.dosenId,
+            pj_nama: jadwal.pjNama
+        };
 
-    updateJadwal(id, updates) {
-        const data = this.getJadwal();
-        const index = data.findIndex(j => j.id === id);
-        if (index !== -1) {
-            data[index] = { ...data[index], ...updates };
-            this.saveJadwal(data);
-            return data[index];
+        const result = await SupabaseClient.insert('jadwal', dbData);
+        if (result && result.length > 0) {
+            await this.fetchJadwal();
+            return this.mapJadwalFromDb(result[0]);
         }
         return null;
     },
 
-    deleteJadwal(id) {
-        const data = this.getJadwal();
-        const filtered = data.filter(j => j.id !== id);
-        this.saveJadwal(filtered);
+    async updateJadwal(id, updates) {
+        const dbData = {};
+        if (updates.hari) dbData.hari = updates.hari;
+        if (updates.jamMulai) dbData.jam_mulai = updates.jamMulai;
+        if (updates.jamSelesai) dbData.jam_selesai = updates.jamSelesai;
+        if (updates.ruangan) dbData.ruangan = updates.ruangan;
+        if (updates.mkId) dbData.mk_id = updates.mkId;
+        if (updates.dosenId) dbData.dosen_id = updates.dosenId;
+        if (updates.pjNama) dbData.pj_nama = updates.pjNama;
+
+        dbData.updated_at = new Date().toISOString();
+
+        const result = await SupabaseClient.update('jadwal', id, dbData);
+        if (result) {
+            await this.fetchJadwal();
+            return true;
+        }
+        return false;
+    },
+
+    async deleteJadwal(id) {
+        const result = await SupabaseClient.delete('jadwal', id);
+        if (result) {
+            await this.fetchJadwal();
+        }
+        return result;
+    },
+
+    // Map database columns to JS object
+    mapJadwalFromDb(dbRow) {
+        return {
+            id: dbRow.id,
+            hari: dbRow.hari,
+            jamMulai: dbRow.jam_mulai,
+            jamSelesai: dbRow.jam_selesai,
+            ruangan: dbRow.ruangan,
+            mkId: dbRow.mk_id,
+            dosenId: dbRow.dosen_id,
+            pjNama: dbRow.pj_nama
+        };
     },
 
     // ============================================
-    // HELPER FUNCTIONS (Updated to use localStorage)
+    // HELPER FUNCTIONS
     // ============================================
 
     getJadwalWithDetails(jadwal) {
-        const mk = this.getMataKuliahById(jadwal.mkId);
-        const dosen = this.getDosenById(jadwal.dosenId);
+        // Handle both DB format and JS format
+        const mkId = jadwal.mk_id || jadwal.mkId;
+        const dosenId = jadwal.dosen_id || jadwal.dosenId;
+
+        const mk = this.getMataKuliahById(mkId);
+        const dosen = this.getDosenById(dosenId);
+
         return {
-            ...jadwal,
+            id: jadwal.id,
+            hari: jadwal.hari,
+            jamMulai: jadwal.jam_mulai || jadwal.jamMulai,
+            jamSelesai: jadwal.jam_selesai || jadwal.jamSelesai,
+            ruangan: jadwal.ruangan,
+            mkId: mkId,
+            dosenId: dosenId,
+            pjNama: jadwal.pj_nama || jadwal.pjNama,
             mataKuliah: mk,
-            dosen: dosen
+            dosen: dosen ? this.mapDosenFromDb(dosen) : null
         };
     },
 
@@ -212,7 +323,7 @@ const DataManager = {
         return this.getJadwal()
             .filter(j => j.hari === hariIni)
             .map(j => this.getJadwalWithDetails(j))
-            .filter(j => j.mataKuliah && j.dosen) // Filter out orphaned jadwal
+            .filter(j => j.mataKuliah && j.dosen)
             .sort((a, b) => a.jamMulai.localeCompare(b.jamMulai));
     },
 
@@ -221,9 +332,16 @@ const DataManager = {
             .filter(j => j.hari === hari)
             .map(j => this.getJadwalWithDetails(j))
             .filter(j => j.mataKuliah && j.dosen)
-            .sort((a, b) => a.jamMulai.localeCompare(b.jamMulai));
+            .sort((a, b) => (a.jamMulai || a.jam_mulai).localeCompare(b.jamMulai || b.jam_mulai));
+    },
+
+    // Reset to initial state (re-fetch from database)
+    async resetToDefault() {
+        await this.refreshAllData();
     }
 };
 
-// Initialize on load
-DataManager.init();
+// Initialize when loaded
+(async () => {
+    await DataManager.init();
+})();
